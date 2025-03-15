@@ -1,0 +1,153 @@
+import threading
+import queue
+import time
+import random
+from collections import OrderedDict
+
+# Memory Management with Paging
+class Page:
+    def __init__(self, process_id, page_number):
+        self.process_id = process_id
+        self.page_number = page_number
+
+class MemoryManager:
+    def __init__(self, total_frames, algorithm="FIFO"):
+        self.total_frames = total_frames
+        self.frames = []  # FIFO Queue
+        self.page_table = {}  # Maps (process_id, page_number) to Page
+        self.page_faults = 0
+        self.memory_usage = {}  # Track memory usage per process
+        self.algorithm = algorithm
+        self.lru_cache = OrderedDict() if algorithm == "LRU" else None
+
+    def allocate_page(self, process_id, page_number):
+        page = Page(process_id, page_number)
+
+        # Track memory usage per process
+        if process_id not in self.memory_usage:
+            self.memory_usage[process_id] = 0
+        self.memory_usage[process_id] += 1
+
+        # If memory is full, replace a page
+        if len(self.frames) >= self.total_frames:
+            self.replace_page(page)
+        else:
+            self.frames.append(page)
+            self.page_table[(process_id, page_number)] = page
+            if self.algorithm == "LRU":
+                self.lru_cache[(process_id, page_number)] = page
+
+    def replace_page(self, new_page):
+        if self.algorithm == "FIFO":
+            removed_page = self.frames.pop(0)  # FIFO replacement
+        elif self.algorithm == "LRU":
+            removed_page = next(iter(self.lru_cache))
+            del self.lru_cache[removed_page]  # Remove LRU page
+        
+        del self.page_table[(removed_page.process_id, removed_page.page_number)]
+        self.frames.append(new_page)
+        self.page_table[(new_page.process_id, new_page.page_number)] = new_page
+        
+        if self.algorithm == "LRU":
+            self.lru_cache[(new_page.process_id, new_page.page_number)] = new_page
+
+    def access_page(self, process_id, page_number):
+        if (process_id, page_number) not in self.page_table:
+            print(f"Page fault for process {process_id}, page {page_number}")
+            self.page_faults += 1
+            self.allocate_page(process_id, page_number)
+        else:
+            print(f"Process {process_id} accessed page {page_number}")
+            if self.algorithm == "LRU":
+                self.lru_cache.move_to_end((process_id, page_number))
+
+    def print_memory_usage(self):
+        print("Memory Usage:", self.memory_usage)
+        print(f"Total Page Faults: {self.page_faults}")
+
+# Producer-Consumer Synchronization
+class ProducerConsumer:
+    def __init__(self, buffer_size):
+        self.buffer = queue.Queue(buffer_size)
+        self.lock = threading.Semaphore(buffer_size)
+        self.items = threading.Semaphore(0)
+
+    def produce(self, item):
+        self.lock.acquire()
+        self.buffer.put(item)
+        print(f"Produced: {item}")
+        self.items.release()
+
+    def consume(self):
+        self.items.acquire()
+        item = self.buffer.get()
+        print(f"Consumed: {item}")
+        self.lock.release()
+
+# Dining Philosophers Problem
+class DiningPhilosophers:
+    def __init__(self, num_philosophers):
+        self.num_philosophers = num_philosophers
+        self.forks = [threading.Semaphore(1) for _ in range(num_philosophers)]
+    
+    def philosopher(self, index):
+        left_fork = self.forks[index]
+        right_fork = self.forks[(index + 1) % self.num_philosophers]
+        
+        while True:
+            print(f"Philosopher {index} is thinking.")
+            time.sleep(random.uniform(0.1, 0.5))
+            left_fork.acquire()
+            right_fork.acquire()
+            print(f"Philosopher {index} is eating.")
+            time.sleep(random.uniform(0.1, 0.5))
+            left_fork.release()
+            right_fork.release()
+            print(f"Philosopher {index} finished eating.")
+
+    def start_dining(self):
+        philosophers = []
+        for i in range(self.num_philosophers):
+            t = threading.Thread(target=self.philosopher, args=(i,))
+            philosophers.append(t)
+            t.start()
+        for t in philosophers:
+            t.join()
+
+# Demonstration
+def producer_task(pc, num_items):
+    for i in range(num_items):
+        time.sleep(random.uniform(0.1, 0.5))
+        pc.produce(f"Item {i}")
+
+def consumer_task(pc, num_items):
+    for _ in range(num_items):
+        time.sleep(random.uniform(0.1, 0.5))
+        pc.consume()
+
+if __name__ == "__main__":
+    # Memory Management Demonstration
+    memory_manager = MemoryManager(total_frames=3, algorithm="LRU")  # Choose "FIFO" or "LRU"
+    for i in range(5):
+        memory_manager.access_page(process_id=1, page_number=i)
+    memory_manager.print_memory_usage()
+
+    # Process Synchronization Demonstration
+    buffer_size = 3
+    num_items = 5
+    pc = ProducerConsumer(buffer_size)
+
+    producer = threading.Thread(target=producer_task, args=(pc, num_items))
+    consumer = threading.Thread(target=consumer_task, args=(pc, num_items))
+
+    producer.start()
+    consumer.start()
+
+    producer.join()
+    consumer.join()
+
+    # Dining Philosophers Demonstration
+    philosophers_problem = DiningPhilosophers(num_philosophers=5)
+    dining_thread = threading.Thread(target=philosophers_problem.start_dining)
+    dining_thread.start()
+    dining_thread.join()
