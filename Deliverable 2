@@ -1,0 +1,99 @@
+import time
+import heapq
+from collections import deque
+
+class Process:
+    def __init__(self, pid, burst_time, arrival_time, priority=0):
+        self.pid = pid
+        self.burst_time = burst_time
+        self.arrival_time = arrival_time
+        self.priority = priority
+        self.remaining_time = burst_time
+        self.start_time = None  
+        self.completion_time = None 
+        self.waiting_time = 0 
+        self.turnaround_time = 0 
+        self.response_time = None 
+
+    def __lt__(self, other):#For priority queue comparison (higher priority first)
+        return self.priority > other.priority
+
+class Scheduler:
+    def __init__(self):
+        self.process_list = []
+    
+    def add_process(self, pid, burst_time, arrival_time, priority=0):
+        process = Process(pid, burst_time, arrival_time, priority)
+        self.process_list.append(process)
+    
+    def round_robin(self, time_slice):#Round-Robin Scheduling Algorithm
+        queue = deque(sorted(self.process_list, key=lambda p: p.arrival_time))
+        time_elapsed = 0
+        
+        while queue:
+            process = queue.popleft()
+            if process.start_time is None:
+                process.start_time = time_elapsed
+                process.response_time = time_elapsed - process.arrival_time
+            
+            execution_time = min(time_slice, process.remaining_time)
+            print(f"Executing Process {process.pid} for {execution_time} time units")
+            time.sleep(execution_time / 10)  # Simulating execution
+            time_elapsed += execution_time
+            process.remaining_time -= execution_time
+            
+            if process.remaining_time > 0:
+                queue.append(process)
+            else:
+                process.completion_time = time_elapsed
+                process.turnaround_time = process.completion_time - process.arrival_time
+                process.waiting_time = process.turnaround_time - process.burst_time
+                print(f"Process {process.pid} completed at time {time_elapsed}")
+        
+        self.display_results()
+
+    def priority_scheduling(self):#Priority-Based Scheduling Algorithm
+        heap = []
+        time_elapsed = 0
+        processes_sorted = sorted(self.process_list, key=lambda p: p.arrival_time)
+        index = 0
+        
+        while index < len(processes_sorted) or heap:
+            while index < len(processes_sorted) and processes_sorted[index].arrival_time <= time_elapsed:
+                heapq.heappush(heap, processes_sorted[index])
+                index += 1
+            
+            if heap:
+                process = heapq.heappop(heap)
+                if process.start_time is None:
+                    process.start_time = time_elapsed
+                    process.response_time = time_elapsed - process.arrival_time
+                
+                print(f"Executing Process {process.pid} with priority {process.priority}")
+                time.sleep(process.burst_time / 10)  # Simulating execution
+                time_elapsed += process.burst_time
+                process.completion_time = time_elapsed
+                process.turnaround_time = process.completion_time - process.arrival_time
+                process.waiting_time = process.turnaround_time - process.burst_time
+                print(f"Process {process.pid} completed at time {time_elapsed}")
+        
+        self.display_results()
+
+    def display_results(self):
+        print("\nProcess Scheduling Results:")
+        print("PID | Arrival | Burst | Priority | Completion | Turnaround | Waiting | Response")
+        for p in sorted(self.process_list, key=lambda p: p.pid):
+            print(f"{p.pid:<3} | {p.arrival_time:<7} | {p.burst_time:<5} | {p.priority:<8} | {p.completion_time:<10} | {p.turnaround_time:<10} | {p.waiting_time:<7} | {p.response_time:<8}")
+
+if __name__ == "__main__":
+    scheduler = Scheduler()
+    scheduler.add_process(1, 5, 0, 2)
+    scheduler.add_process(2, 3, 1, 1)
+    scheduler.add_process(3, 8, 2, 3)
+    scheduler.add_process(4, 6, 3, 2)
+    
+    print("Running Round-Robin Scheduling with Time Slice = 2")
+    scheduler.round_robin(time_slice=2)
+    
+    print("\nRunning Priority-Based Scheduling")
+    scheduler.priority_scheduling()
