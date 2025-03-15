@@ -41,9 +41,9 @@ class MemoryManager:
         if self.algorithm == "FIFO":
             removed_page = self.frames.pop(0)  # FIFO replacement
         elif self.algorithm == "LRU":
-            removed_page = next(iter(self.lru_cache))
-            del self.lru_cache[removed_page]  # Remove LRU page
-        
+            removed_page_key = next(iter(self.lru_cache))
+            removed_page = self.lru_cache.pop(removed_page_key)  # Remove LRU page
+
         del self.page_table[(removed_page.process_id, removed_page.page_number)]
         self.frames.append(new_page)
         self.page_table[(new_page.process_id, new_page.page_number)] = new_page
@@ -84,17 +84,18 @@ class ProducerConsumer:
         print(f"Consumed: {item}")
         self.lock.release()
 
-# Dining Philosophers Problem
+# Dining Philosophers
 class DiningPhilosophers:
-    def __init__(self, num_philosophers):
+    def __init__(self, num_philosophers, meal_limit=5):
         self.num_philosophers = num_philosophers
+        self.meal_limit = meal_limit
         self.forks = [threading.Semaphore(1) for _ in range(num_philosophers)]
     
     def philosopher(self, index):
         left_fork = self.forks[index]
         right_fork = self.forks[(index + 1) % self.num_philosophers]
         
-        while True:
+        for _ in range(self.meal_limit):  # 제한된 횟수만 반복
             print(f"Philosopher {index} is thinking.")
             time.sleep(random.uniform(0.1, 0.5))
             left_fork.acquire()
