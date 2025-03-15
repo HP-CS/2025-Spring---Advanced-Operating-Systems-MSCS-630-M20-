@@ -127,11 +127,19 @@ def consumer_task(pc, num_items):
         pc.consume()
 
 if __name__ == "__main__":
-    # Memory Management Demonstration
-    memory_manager = MemoryManager(total_frames=3, algorithm="LRU")  # Choose "FIFO" or "LRU"
+    # FIFO Memory Management Demonstration
+    print("\n=== FIFO Page Replacement ===")
+    fifo_manager = MemoryManager(total_frames=3, algorithm="FIFO")
     for i in range(5):
-        memory_manager.access_page(process_id=1, page_number=i)
-    memory_manager.print_memory_usage()
+        fifo_manager.access_page(process_id=1, page_number=i)
+    fifo_manager.print_memory_usage()
+
+    # LRU Memory Management Demonstration
+    print("\n=== LRU Page Replacement ===")
+    lru_manager = MemoryManager(total_frames=3, algorithm="LRU")
+    for i in range(5):
+        lru_manager.access_page(process_id=1, page_number=i)
+    lru_manager.print_memory_usage()
 
     # Process Synchronization Demonstration
     buffer_size = 3
