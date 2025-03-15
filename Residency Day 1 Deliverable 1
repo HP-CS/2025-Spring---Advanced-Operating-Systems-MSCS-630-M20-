@@ -1,0 +1,97 @@
+import os
+import subprocess
+import sys
+
+background_jobs = {} 
+job_counter = 1
+
+def execute_command(command):
+    global background_jobs, job_counter
+
+    if not command:
+        return
+
+    if command[0] == "exit":
+        print("Exiting shell...")
+        sys.exit(0)
+    elif command[0] == "cd":
+        try:
+            os.chdir(command[1])
+        except IndexError:
+            print("cd: missing argument")
+        except FileNotFoundError:
+            print("cd: no such directory")
+        return
+    elif command[0] == "pwd":
+        print(os.getcwd())
+        return
+    elif command[0] == "echo":
+        print(" ".join(command[1:]))
+        return
+    elif command[0] == "clear":
+        os.system("cls")
+        return
+    elif command[0] == "jobs":
+        for job_id, process in background_jobs.items():
+            print(f"[{job_id}] Running - PID: {process.pid}")
+        return
+    elif command[0] == "kill":
+        try:
+            pid = int(command[1])
+            subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"Killed process {pid}")
+            background_jobs.pop(pid, None)
+        except (IndexError, ValueError):
+            print("kill: invalid process ID")
+        return
+    elif command[0] == "fg":
+        try:
+            job_id = int(command[1])
+            if job_id in background_jobs:
+                process = background_jobs[job_id]
+                print(f"Bringing job {job_id} (PID {process.pid}) to foreground")
+                subprocess.run(["cmd", "/c", f"start {process.args[0]}"], shell=True)
+            else:
+                print(f"fg: No such job {job_id}")
+        except (IndexError, ValueError):
+            print("fg: Invalid job ID")
+        return
+    elif command[0] == "bg":
+        try:
+            job_id = int(command[1])
+            if job_id in background_jobs:
+                process = background_jobs[job_id]
+                print(f"Resuming job {job_id} (PID {process.pid}) in background")
+                subprocess.run(["powershell", "-Command", f"Resume-Process -Id {process.pid}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                print(f"bg: No such job {job_id}")
+        except (IndexError, ValueError):
+            print("bg: Invalid job ID")
+        return
+
+    if command[0] in ["dir", "mkdir", "rmdir"]:
+        command = ["cmd", "/c"] + command
+
+    background = False
+    if command[-1] == "&":
+        background = True
+        command = command[:-1]
+
+    try:
+        if background:
+            process = subprocess.Popen(command, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            background_jobs[job_counter] = process
+            print(f"Started background job [{job_counter}] with PID {process.pid}")
+            job_counter += 1
+        else:
+            subprocess.run(command, check=True)
+    except FileNotFoundError:
+        print(f"{command[0]}: command not found")
+
+def shell():
+    while True:
+        command = input("shell> ").strip().split()
+        execute_command(command)
+
+if __name__ == "__main__":
+    shell()
