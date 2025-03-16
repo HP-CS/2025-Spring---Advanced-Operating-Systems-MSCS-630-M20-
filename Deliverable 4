@@ -1,0 +1,99 @@
+import os
+import subprocess
+import platform
+import sys
+
+default_users = {
+    "admin": {"password": "admin123", "role": "admin"},
+    "user1": {"password": "userpass", "role": "standard"}
+}
+
+command_mappings = {
+    "ls": "dir",
+    "pwd": "cd",
+    "clear": "cls",
+    "touch": "echo. >",
+    "rm": "del",
+    "cat": "type",
+    "grep": "findstr",
+    "sort": "sort",
+    "sleep": "timeout /t" if platform.system() == "Windows" else "sleep"
+}
+
+restricted_paths = ["/etc/system_file.txt", "C:\\Windows\\system32\\important.txt"]
+
+def authenticate_user():
+    print("Welcome to the Secure Shell")
+    if not sys.stdin.isatty():
+        print("Non-interactive environment detected. Auto-login as 'admin'.")
+        return "admin", "admin"
+
+    while True:
+        username = input("Username: ").strip()
+        password = input("Password: ").strip()
+        if username in default_users and default_users[username]["password"] == password:
+            print(f"Welcome, {username}! You are logged in as {default_users[username]['role']}.")
+            return username, default_users[username]["role"]
+        else:
+            print("Invalid credentials. Please try again.")
+
+def execute_command(username, role, command):
+    system_os = platform.system()
+
+    for restricted in restricted_paths:
+        if restricted in command:
+            print(f"Access denied: {username} does not have permission to modify {restricted}")
+            return
+
+    if command.strip() == "exit":
+        print("Exiting shell...")
+        exit(0)
+
+    if "|" in command:
+        commands = [cmd.strip().split() for cmd in command.split("|")]
+        prev_proc = None
+
+        for cmd in commands:
+            if system_os == "Windows":
+                if cmd[0] in command_mappings:
+                    cmd[0] = command_mappings[cmd[0]]
+            
+            if prev_proc is None:
+                prev_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+            else:
+                prev_proc = subprocess.Popen(cmd, stdin=prev_proc.stdout, stdout=subprocess.PIPE, shell=True)
+
+        output, _ = prev_proc.communicate()
+        print(output.decode().strip())
+
+    else:
+        cmd_parts = command.split()
+        if cmd_parts[0] in command_mappings:
+            cmd_parts[0] = command_mappings[cmd_parts[0]]
+
+        try:
+            if system_os == "Windows":
+                result = subprocess.run(["cmd.exe", "/c"] + cmd_parts, capture_output=True, text=True)
+            else:
+                result = subprocess.run(cmd_parts, shell=True, capture_output=True, text=True)
+
+            if result.stdout:
+                print(result.stdout.strip())
+            if result.stderr:
+                print(result.stderr.strip())
+
+        except Exception as e:
+            print(f"Error executing command: {e}")
+
+def shell():
+    username, role = authenticate_user()
+    while True:
+        try:
+            command = input(f"{username}@shell$ ").strip()
+            execute_command(username, role, command)
+        except EOFError:
+            print("\nExiting shell...")
+            break
+
+if __name__ == "__main__":
+    shell()
